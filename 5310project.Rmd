@@ -1,0 +1,243 @@
+---
+title: "5310project"
+author: "Qiuhan Li T00728225"
+date: "2024-03-31"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r}
+# Newton-Raphson algorithm for simple linear regression
+newtonRaphson_linear <- function(y, X, tolerence = 1e-7) {
+  # Add intercept term to the feature matrix
+  X <- cbind(1, X)
+  
+  # Initialize beta coefficients
+  beta <- rep(0, times = ncol(X))
+  
+  # Compute predictions
+  y_hat <- X %*% beta
+  
+  # Calculate gradient and Hessian matrix
+  grad <- t(X) %*% (y_hat - y)
+  hessian <- t(X) %*% X
+  
+  # Compute coefficients until convergence or maximum iteration reached
+  while (norm(grad, "2") > tolerence) {
+    # Update beta coefficients
+    delta_beta <- solve(hessian) %*% grad
+    beta <- beta - delta_beta
+    
+    # Update predictions
+    y_hat <- X %*% beta
+    
+    # Calculate gradient and Hessian matrix
+    grad <- t(X) %*% (y_hat - y)
+    hessian <- t(X) %*% X
+  }
+  
+  # Return beta coefficients
+  return(beta)
+}
+
+```
+
+```{r}
+# Load the "winequality" dataset directly from URL
+winequality <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv", header = TRUE, sep = ";")
+
+# Display the structure of the dataset
+str(winequality)
+
+# Display the first few rows of the dataset
+head(winequality)
+
+# Get the number of rows and columns
+num_rows <- nrow(winequality)
+num_cols <- ncol(winequality)
+
+# Print the number of rows and columns
+cat("Number of rows:", num_rows, "\n")
+cat("Number of columns:", num_cols, "\n")
+summary(winequality)
+
+# Select only the numerical columns for scaling
+numerical_cols <- winequality[, sapply(winequality, is.numeric)]
+
+# Scale the numerical columns
+scaled_data <- as.data.frame(scale(numerical_cols))
+summary(scaled_data)
+```
+
+
+
+```{r}
+features <- c("fixed.acidity", "volatile.acidity", "citric.acid", "residual.sugar", "chlorides", "free.sulfur.dioxide", "total.sulfur.dioxide", "density", "pH", "sulphates", "alcohol")
+
+# Extracting features and response variable
+X <- as.matrix(winequality[, features]) # Convert to matrix
+y <- as.numeric(winequality$quality)    # Convert to numeric vector
+
+# Training the model
+#beta <- newtonRaphson_linear(y, X)
+#beta
+# Adding intercept to the feature matrix for predictions
+#X <- cbind(1, X)
+
+# Making predictions
+#predicted_quality <- X %*% beta
+
+
+```
+#standardize
+```{r}
+# Define function to standardize features
+standardize_features <- function(X) {
+  # Compute mean and standard deviation of each feature
+  means <- colMeans(X)
+  std_devs <- apply(X, 2, sd)
+  
+  # Standardize each feature
+  standardized_X <- scale(X, center = means, scale = std_devs)
+  
+  return(standardized_X)
+}
+#standardized_X <- standardize_features(X)
+#standardized_X
+```
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Determine the number of observations
+num_obs <- nrow(winequality)
+
+# Shuffle the indices of observations
+shuffled_indices <- sample(num_obs)
+
+# Calculate the sizes of training, validation, and test sets
+train_size <- floor(0.5 * num_obs)
+val_size <- floor(0.25 * num_obs)
+test_size <- num_obs - train_size - val_size
+
+# Split the shuffled indices into training, validation, and test sets
+train_indices <- shuffled_indices[1:train_size]
+val_indices <- shuffled_indices[(train_size + 1):(train_size + val_size)]
+test_indices <- shuffled_indices[(train_size + val_size + 1):num_obs]
+
+# Extract features and response variable for each set
+features <- c("fixed.acidity", "volatile.acidity", "citric.acid", "residual.sugar", "chlorides", "free.sulfur.dioxide", "total.sulfur.dioxide", "density", "pH", "sulphates", "alcohol")
+
+X_train <- as.matrix(winequality[train_indices, features])
+y_train <- as.numeric(winequality[train_indices, "quality"])
+
+X_val <- as.matrix(winequality[val_indices, features])
+y_val <- as.numeric(winequality[val_indices, "quality"])
+
+X_test <- as.matrix(winequality[test_indices, features])
+y_test <- as.numeric(winequality[test_indices, "quality"])
+
+# Standardize the features for each dataset
+X_train_standardized <- standardize_features(X_train)
+X_val_standardized <- standardize_features(X_val)
+X_test_standardized <- standardize_features(X_test)
+
+# Training the model with standardized features
+beta <- newtonRaphson_linear(y_train, X_train_standardized)
+
+# Adding intercept to the feature matrix for predictions
+X_train_standardized <- cbind(1, X_train_standardized)
+X_val_standardized <- cbind(1, X_val_standardized)
+X_test_standardized <- cbind(1, X_test_standardized)
+# Making predictions on validation and test sets with standardized features
+predicted_quality_val <- X_val_standardized %*% beta
+predicted_quality_test <- X_test_standardized %*% beta
+
+# Print the coefficients
+cat("Coefficients:", beta, "\n")
+
+# Print the first few predicted quality values for validation set
+cat("Predicted quality for validation set:", head(predicted_quality_val), "\n")
+
+# Print the first few predicted quality values for test set
+cat("Predicted quality for test set:", head(predicted_quality_test), "\n")
+
+
+```
+
+```{r}
+# Compute Root Mean Squared Error (RMSE) for validation set
+rmse_val <- sqrt(mean((y_val - predicted_quality_val)^2))
+
+# Compute Root Mean Squared Error (RMSE) for test set
+rmse_test <- sqrt(mean((y_test - predicted_quality_test)^2))
+
+# Print RMSE for validation set
+cat("RMSE for validation set:", rmse_val, "\n")
+
+# Print RMSE for test set
+cat("RMSE for test set:", rmse_test, "\n")
+```
+
+```{r}
+# Function to perform bootstrap with Newton-Raphson
+bootstrap_evaluation_newtonRaphson <- function(num_bootstrap, y, X) {
+  rmse_bootstrap <- numeric(num_bootstrap)
+  
+  for (i in 1:num_bootstrap) {
+    # Resample indices
+    boot_indices <- sample(1:length(y), replace = TRUE)
+    y_boot <- y[boot_indices]
+    X_boot <- X[boot_indices, ]
+    
+    # Train the model with Newton-Raphson
+    beta_boot <- newtonRaphson_linear(y_boot, X_boot)
+    
+    # Predictions on original dataset
+    predicted_quality_boot <- cbind(1, X) %*% beta_boot
+    
+    # Calculate RMSE
+    rmse_bootstrap[i] <- calculate_rmse(y, predicted_quality_boot)
+  }
+  
+  return(rmse_bootstrap)
+}
+
+calculate_rmse <- function(actual, predicted) {
+  return(sqrt(mean((actual - predicted)^2)))
+}
+# Set seed for reproducibility
+set.seed(123)
+
+# Perform bootstrap evaluation with Newton-Raphson
+# Standardize the features for each dataset
+X_train_standardized <- standardize_features(X_train)
+X_val_standardized <- standardize_features(X_val)
+X_test_standardized <- standardize_features(X_test)
+num_bootstrap <- 1000  # Number of bootstrap iterations
+rmse_bootstrap_val <- bootstrap_evaluation_newtonRaphson(num_bootstrap, y_val, X_val_standardized)
+rmse_bootstrap_test <- bootstrap_evaluation_newtonRaphson(num_bootstrap, y_test, X_test_standardized)
+
+# Calculate 95% confidence interval for validation and test sets
+ci_val <- quantile(rmse_bootstrap_val, c(0.025, 0.975))
+ci_test <- quantile(rmse_bootstrap_test, c(0.025, 0.975))
+
+# Print the confidence intervals
+cat("95% CI for validation set RMSE:", ci_val, "\n")
+cat("95% CI for test set RMSE:", ci_test, "\n")
+
+```
+
